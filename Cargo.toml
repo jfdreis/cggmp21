@@ -15,7 +15,7 @@ cggmp21 = { version = "0.6", path = "cggmp21" }
 cggmp21-keygen = { version = "0.5", path = "cggmp21-keygen" }
 key-share = { version = "0.6", path = "key-share", default-features = false }
 
-generic-ec = { version = "0.4.1", default-features = false } 
+generic-ec = { version = "0.4.5", default-features = false } 
 generic-ec-zkp = { version = "0.4.1", default-features = false } 
 round-based = { version = "0.4.1", default-features = false }
 
