@@ -258,12 +258,12 @@ pub mod interactive {
     ) -> Result<Proof<E>, Error> {
         let z1 = (&private_commitment.alpha + (challenge * pdata.plaintext)).complete();
         let z2 = {
-            let nonce_to_challenge_mod_n: Integer = pdata
+            let rho_to_challenge_mod_n: Integer = pdata
                 .rho
                 .pow_mod_ref(challenge, data.n_0.n())
                 .ok_or(BadExponent::undefined())?
                 .into();
-            (&private_commitment.r * nonce_to_challenge_mod_n).modulo(data.n_0.n())
+            (&private_commitment.r * rho_to_challenge_mod_n).modulo(data.n_0.n())
         };
         let z3 = (&private_commitment.gamma + (challenge * &private_commitment.mu)).complete();
         let w = private_commitment.beta + (challenge.to_scalar() * pdata.b);
@@ -285,12 +285,12 @@ pub mod interactive {
                 .encrypt_with(&proof.z1, &proof.z2)
                 .map_err(|_| InvalidProofReason::PaillierEnc)?;
             let rhs = {
-                let e_at_c = data
+                let challenge_at_c = data
                     .n_0
                     .omul(challenge, data.ciphertext)
                     .map_err(|_| InvalidProofReason::PaillierOp)?;
                 data.n_0
-                    .oadd(&commitment.d, &e_at_c)
+                    .oadd(&commitment.d, &challenge_at_c)
                     .map_err(|_| InvalidProofReason::PaillierOp)?
             };
             fail_if_ne(InvalidProofReason::EqualityCheck(1), lhs, rhs)?;
