@@ -8,9 +8,9 @@
 //! $\ell$ and $\varepsilon$, [curve `E`](Curve), Paillier public `key`, a `ciphertext`,
 //! and elliptic points $A, B, X$.
 //!
-//! Prover secret inputs: `plaintext`, `nonce`, scalars $a, b$, such that:
+//! Prover secret inputs: `plaintext`, `rho`, scalars $a, b$, such that:
 //! * `plaintext` $\in \pm 2^\ell$
-//! * `ciphertext == key.encrypt_with(plaintext, nonce)`
+//! * `ciphertext == n_0.encrypt_with(plaintext, rho)`
 //! * $A = a \cdot G$
 //! * $B = b \cdot G$
 //! * $X = (a b + \text{plaintext}) \cdot G$
@@ -44,22 +44,22 @@
 //!     epsilon: 128,
 //! };
 //! // ...and someone's encryption key
-//! let key: fast_paillier::EncryptionKey =
+//! let n_0: fast_paillier::EncryptionKey =
 //!     pregenerated::someone_encryption_key();
 //!
 //! // Prover knows its secret `pdata` and `a`
 //! let a = Scalar::random(&mut rng);
 //! let pdata = p::PrivateData {
 //!     plaintext: &Integer::from_rng_half_pm(&(Integer::ONE << security.l).complete(), &mut rng),
-//!     nonce: &Integer::gen_invertible(key.n(), &mut rng),
+//!     rho: &Integer::gen_invertible(n_0.n(), &mut rng),
 //!     b: &Scalar::random(&mut rng),
 //! };
 //!
 //! // Both parties know the public data
 //! let data = p::Data {
-//!     key: &key,
-//!     ciphertext: &key
-//!         .encrypt_with(pdata.plaintext, pdata.nonce)
+//!     n_0: &n_0,
+//!     ciphertext: &n_0
+//!         .encrypt_with(pdata.plaintext, pdata.rho)
 //!         .unwrap(),
 //!     a: &(Point::generator() * a),
 //!     b: &(Point::generator() * pdata.b),
@@ -123,7 +123,7 @@ pub struct SecurityParams {
 pub struct Data<'a, C: Curve> {
     /// $N_0$ in paper
     #[udigest(as = crate::common::encoding::AnyEncryptionKey)]
-    pub key: &'a dyn AnyEncryptionKey,
+    pub n_0: &'a dyn AnyEncryptionKey,
     /// $C$ in paper
     #[udigest(as = &crate::common::encoding::Integer)]
     pub ciphertext: &'a Ciphertext,
@@ -141,7 +141,7 @@ pub struct PrivateData<'a, E: Curve> {
     /// $x$ in paper
     pub plaintext: &'a Plaintext,
     /// $\rho$ in paper
-    pub nonce: &'a Nonce,
+    pub rho: &'a Nonce,
     /// $b$ in paper
     pub b: &'a Scalar<E>,
 }
@@ -227,13 +227,13 @@ pub mod interactive {
 
         let alpha = Integer::from_rng_half_pm(&two_to_l_plus_e, rng);
         let mu = Integer::from_rng_half_pm(&n_j_at_two_to_l, rng);
-        let r = Integer::gen_invertible(data.key.n(), rng);
+        let r = Integer::gen_invertible(data.n_0.n(), rng);
         let beta = Scalar::random(rng);
         let gamma = Integer::from_rng_half_pm(&n_j_at_two_to_l_plus_e, rng);
 
         let s = aux.combine(pdata.plaintext, &mu)?;
         let t = aux.combine(&alpha, &gamma)?;
-        let d = data.key.encrypt_with(&alpha, &r)?;
+        let d = data.n_0.encrypt_with(&alpha, &r)?;
         let y = data.a * beta + Point::<E>::generator() * alpha.to_scalar();
         let z = Point::<E>::generator() * beta;
 
@@ -259,11 +259,11 @@ pub mod interactive {
         let z1 = (&private_commitment.alpha + (challenge * pdata.plaintext)).complete();
         let z2 = {
             let nonce_to_challenge_mod_n: Integer = pdata
-                .nonce
-                .pow_mod_ref(challenge, data.key.n())
+                .rho
+                .pow_mod_ref(challenge, data.n_0.n())
                 .ok_or(BadExponent::undefined())?
                 .into();
-            (&private_commitment.r * nonce_to_challenge_mod_n).modulo(data.key.n())
+            (&private_commitment.r * nonce_to_challenge_mod_n).modulo(data.n_0.n())
         };
         let z3 = (&private_commitment.gamma + (challenge * &private_commitment.mu)).complete();
         let w = private_commitment.beta + (challenge.to_scalar() * pdata.b);
@@ -281,15 +281,15 @@ pub mod interactive {
     ) -> Result<(), InvalidProof> {
         {
             let lhs = data
-                .key
+                .n_0
                 .encrypt_with(&proof.z1, &proof.z2)
                 .map_err(|_| InvalidProofReason::PaillierEnc)?;
             let rhs = {
                 let e_at_c = data
-                    .key
+                    .n_0
                     .omul(challenge, data.ciphertext)
                     .map_err(|_| InvalidProofReason::PaillierOp)?;
-                data.key
+                data.n_0
                     .oadd(&commitment.d, &e_at_c)
                     .map_err(|_| InvalidProofReason::PaillierOp)?
             };
@@ -419,14 +419,14 @@ mod test {
         let a = Scalar::random(rng);
         let pdata = super::PrivateData {
             plaintext: &plaintext,
-            nonce: &Integer::gen_invertible(private_key.n(), rng),
+            rho: &Integer::gen_invertible(private_key.n(), rng),
             b: &Scalar::random(rng),
         };
 
         let data = super::Data {
-            key: private_key.encryption_key(),
+            n_0: private_key.encryption_key(),
             ciphertext: &private_key
-                .encrypt_with(pdata.plaintext, pdata.nonce)
+                .encrypt_with(pdata.plaintext, pdata.rho)
                 .unwrap(),
             a: &(Point::generator() * a),
             b: &(Point::generator() * pdata.b),

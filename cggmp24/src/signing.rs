@@ -771,7 +771,7 @@ where
             },
             &R_j.into(),
             pi_enc_elg::Data {
-                key: &dec_i,
+                n_0: &dec_i,
                 ciphertext: &K_i,
                 a: &Y_i,
                 b: &A_i1,
@@ -779,7 +779,7 @@ where
             },
             pi_enc_elg::PrivateData {
                 plaintext: &utils::scalar_to_pm_bignumber(&k_i),
-                nonce: &rho_i,
+                rho: &rho_i,
                 b: a_i.as_ref(),
             },
             &security_params.pi_enc_elg,
@@ -795,7 +795,7 @@ where
             },
             &R_j.into(),
             pi_enc_elg::Data {
-                key: &dec_i,
+                n_0: &dec_i,
                 ciphertext: &G_i,
                 a: &Y_i,
                 b: &B_i1,
@@ -803,7 +803,7 @@ where
             },
             pi_enc_elg::PrivateData {
                 plaintext: &utils::scalar_to_pm_bignumber(&gamma_i),
-                nonce: &v_i,
+                rho: &v_i,
                 b: b_i.as_ref(),
             },
             &security_params.pi_enc_elg,
@@ -898,7 +898,7 @@ where
                 },
                 &R_i.into(),
                 pi_enc_elg::Data {
-                    key: N_j,
+                    n_0: N_j,
                     ciphertext: &ciphertexts.K,
                     a: &ciphertexts.Y,
                     b: &ciphertexts.A1,
@@ -916,7 +916,7 @@ where
                 },
                 &R_i.into(),
                 pi_enc_elg::Data {
-                    key: N_j,
+                    n_0: N_j,
                     ciphertext: &ciphertexts.G,
                     a: &ciphertexts.Y,
                     b: &ciphertexts.B1,
