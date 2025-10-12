@@ -488,10 +488,10 @@ In all the cases where this proof is used in the protocol, the prover knows the 
 \item
 \begin{inlineAlgorithm}
 \algoName{$\challenge{enc}^L() \to e$}
-\algoInputs{security level $L = (Q, \dots)$}
-\algoOutputs{$e \in \pm Q$}
+\algoInputs{security level $L = (q, \dots)$}
+\algoOutputs{$e \in \pm q$}
 \begin{algorithmic}[1]
-\State Sample $e \gets \pm Q$
+\State Sample $e \gets \pm q$
 \State \Return $e$
 \end{algorithmic}
 
@@ -557,7 +557,7 @@ In all the cases where this proof is used in the protocol, the prover knows the 
 \begin{algorithmic}[1]
 \State $((S, A, C); (\alpha, \mu, r, \gamma)) \gets \commit{enc}^L(R_j, N_i; k[, \sk_i])$
     \Comment{generate commitment}
-\State $e \in \pm Q = \challengeni{enc}^L(\state, R_j, (N_i, K), (S, A, C))$
+\State $e \in \pm q = \challengeni{enc}^L(\state, R_j, (N_i, K), (S, A, C))$
     \Comment{deterministically derive challenge}
 \State $(z_1, z_2, z_3) = \prove{enc}((N_i, K), e; \rho, (\alpha, \mu, r, \gamma))$
 \State \Return $((S, A, C), (z_1, z_2, z_3))$
@@ -580,7 +580,7 @@ In all the cases where this proof is used in the protocol, the prover knows the 
 }
 \algoOutputs{aborts if proof is invalid}
 \begin{algorithmic}[1]
-\State $e \in \pm Q = \challengeni{enc}^L(\state, R_j, (N_i, K), (S, A, C))$
+\State $e \in \pm q = \challengeni{enc}^L(\state, R_j, (N_i, K), (S, A, C))$
     \Comment{deterministically derive challenge}
 \State Assert $\verify{enc}^L((N_i, K), (S, A, C), e, (z_1, z_2, z_3))$
 \end{algorithmic}

@@ -3,12 +3,12 @@
 //!
 //! ## Description
 //!
-//! A party P has `key`, `pkey` - public and private keys in paillier
-//! cryptosystem. P also has `plaintext`, `nonce`, and
-//! `ciphertext = key.encrypt_with(plaintext, nonce)`.
+//! A party P has `n_0`, `pkey` - public and private keys in paillier
+//! cryptosystem. P also has `k_plaintext`, `rho`, and
+//! `k_ciphertext = n_0.encrypt_with(k_plaintext, rho)`.
 //!
-//! P wants to prove that `plaintext` is at most `l` bits, without disclosing
-//! it, the `pkey`, and `nonce`
+//! P wants to prove that `k_plaintext` is at most `l` bits, without disclosing
+//! it, the `pkey`, and `rho`
 
 //! ## Example
 //!
@@ -42,23 +42,23 @@
 //!
 //! let private_key: fast_paillier::DecryptionKey =
 //!     pregenerated::prover_decryption_key();
-//! let key = private_key.encryption_key();
+//! let n_0 = private_key.encryption_key();
 //!
 //! // 2. Setup: prover has some plaintext and encrypts it
 //!
-//! let plaintext = Integer::from_rng_half_pm(&(Integer::ONE << security.l).complete(), &mut rng);
-//! let (ciphertext, nonce) = key.encrypt_with_random(&mut rng, &plaintext)?;
+//! let k_plaintext = Integer::from_rng_half_pm(&(Integer::ONE << security.l).complete(), &mut rng);
+//! let (k_ciphertext, rho) = n_0.encrypt_with_random(&mut rng, &k_plaintext)?;
 //!
 //! // 3. Prover computes a non-interactive proof that plaintext is at most 1024 bits:
 //!
-//! let data = p::Data { key, ciphertext: &ciphertext };
+//! let data = p::Data { n_0, k_ciphertext: &k_ciphertext };
 //! let proof = p::non_interactive::prove::<sha2::Sha256>(
 //!     &shared_state,
 //!     &aux,
 //!     data,
 //!     p::PrivateData {
-//!         plaintext: &plaintext,
-//!         nonce: &nonce,
+//!         k_plaintext: &k_plaintext,
+//!         rho: &rho,
 //!     },
 //!     &security,
 //!     &mut rng,
@@ -111,21 +111,21 @@ pub struct SecurityParams {
 /// Public data that both parties know
 #[derive(Debug, Clone, Copy, udigest::Digestable)]
 pub struct Data<'a> {
-    /// N0 in paper, public key that k -> K was encrypted on
+    /// N_0 in paper, public key that k -> K was encrypted on
     #[udigest(as = crate::common::encoding::AnyEncryptionKey)]
-    pub key: &'a dyn AnyEncryptionKey,
+    pub n_0: &'a dyn AnyEncryptionKey,
     /// K in paper
     #[udigest(as = &crate::common::encoding::Integer)]
-    pub ciphertext: &'a Ciphertext,
+    pub k_ciphertext: &'a Ciphertext,
 }
 
 /// Private data of prover
 #[derive(Clone, Copy)]
 pub struct PrivateData<'a> {
     /// k in paper, plaintext of K
-    pub plaintext: &'a Integer,
+    pub k_plaintext: &'a Integer,
     /// rho in paper, nonce of encryption k -> K
-    pub nonce: &'a Nonce,
+    pub rho: &'a Nonce,
 }
 
 // As described in cggmp24 at page 33
@@ -207,11 +207,11 @@ pub mod interactive {
 
         let alpha = Integer::from_rng_half_pm(&two_to_l_plus_e, rng);
         let mu = Integer::from_rng_half_pm(&hat_n_at_two_to_l, rng);
-        let r = Integer::gen_invertible(data.key.n(), rng);
+        let r = Integer::gen_invertible(data.n_0.n(), rng);
         let gamma = Integer::from_rng_half_pm(&hat_n_at_two_to_l_plus_e, rng);
 
-        let s = aux.combine(pdata.plaintext, &mu)?;
-        let a = data.key.encrypt_with(&alpha, &r)?;
+        let s = aux.combine(pdata.k_plaintext, &mu)?;
+        let a = data.n_0.encrypt_with(&alpha, &r)?;
         let c = aux.combine(&alpha, &gamma)?;
 
         Ok((
@@ -232,13 +232,13 @@ pub mod interactive {
         private_commitment: &PrivateCommitment,
         challenge: &Challenge,
     ) -> Result<Proof, Error> {
-        let z1 = (&private_commitment.alpha + (challenge * pdata.plaintext)).complete();
-        let nonce_to_challenge_mod_n: Integer = pdata
-            .nonce
-            .pow_mod_ref(challenge, data.key.n())
+        let z1 = (&private_commitment.alpha + (challenge * pdata.k_plaintext)).complete();
+        let rho_to_challenge_mod_n: Integer = pdata
+            .rho
+            .pow_mod_ref(challenge, data.n_0.n())
             .ok_or(BadExponent::undefined())?
             .into();
-        let z2 = (&private_commitment.r * nonce_to_challenge_mod_n).modulo(data.key.n());
+        let z2 = (&private_commitment.r * rho_to_challenge_mod_n).modulo(data.n_0.n());
         let z3 = (&private_commitment.gamma + (challenge * &private_commitment.mu)).complete();
         Ok(Proof { z1, z2, z3 })
     }
@@ -255,24 +255,24 @@ pub mod interactive {
         {
             fail_if_ne(
                 InvalidProofReason::EqualityCheck(1),
-                &data.ciphertext.gcd_ref(data.key.n()).complete(),
+                &data.k_ciphertext.gcd_ref(data.n_0.n()).complete(),
                 Integer::ONE,
             )?;
         }
         {
-            let lhs = data
-                .key
-                .encrypt_with(&proof.z1, &proof.z2)
-                .map_err(|_| InvalidProofReason::PaillierEnc)?;
-            let rhs = {
-                let e_at_k = data
-                    .key
-                    .omul(challenge, data.ciphertext)
+            let lhs = {
+                let challenge_at_k = data
+                    .n_0
+                    .omul(challenge, data.k_ciphertext)
                     .map_err(|_| InvalidProofReason::PaillierOp)?;
-                data.key
-                    .oadd(&commitment.a, &e_at_k)
+                data.n_0
+                    .oadd(&commitment.a, &challenge_at_k)
                     .map_err(|_| InvalidProofReason::PaillierOp)?
             };
+            let rhs = data
+                .n_0
+                .encrypt_with(&proof.z1, &proof.z2)
+                .map_err(|_| InvalidProofReason::PaillierEnc)?;
             fail_if_ne(InvalidProofReason::EqualityCheck(2), lhs, rhs)?;
         }
 
@@ -377,19 +377,19 @@ mod test {
     fn run_with<D: Digest>(
         mut rng: &mut impl rand_core::CryptoRngCore,
         security: super::SecurityParams,
-        plaintext: Integer,
+        k_plaintext: Integer,
     ) -> Result<(), crate::common::InvalidProof> {
         let aux = crate::common::test::aux(&mut rng);
         let private_key = crate::common::test::random_key(&mut rng).unwrap();
-        let key = private_key.encryption_key();
-        let (ciphertext, nonce) = key.encrypt_with_random(&mut rng, &plaintext).unwrap();
+        let n_0 = private_key.encryption_key();
+        let (k_ciphertext, rho) = n_0.encrypt_with_random(&mut rng, &k_plaintext).unwrap();
         let data = super::Data {
-            key,
-            ciphertext: &ciphertext,
+            n_0,
+            k_ciphertext: &k_ciphertext,
         };
         let pdata = super::PrivateData {
-            plaintext: &plaintext,
-            nonce: &nonce,
+            k_plaintext: &k_plaintext,
+            rho: &rho,
         };
 
         let shared_state = "shared state";
@@ -407,9 +407,9 @@ mod test {
             epsilon: 256,
             q: (Integer::ONE << 128_u32).complete() - 1,
         };
-        let plaintext =
+        let k_plaintext =
             Integer::from_rng_half_pm(&(Integer::ONE << security.l).complete(), &mut rng);
-        let r = run_with::<sha2::Sha256>(&mut rng, security, plaintext);
+        let r = run_with::<sha2::Sha256>(&mut rng, security, k_plaintext);
         match r {
             Ok(()) => (),
             Err(e) => panic!("{e:?}"),
@@ -423,8 +423,8 @@ mod test {
             epsilon: 256,
             q: (Integer::ONE << 128_u32).complete() - 1,
         };
-        let plaintext = (Integer::ONE << (security.l + security.epsilon)).complete() + 1;
-        let r = run_with::<sha2::Sha256>(&mut rng, security, plaintext);
+        let k_plaintext = (Integer::ONE << (security.l + security.epsilon)).complete() + 1;
+        let r = run_with::<sha2::Sha256>(&mut rng, security, k_plaintext);
         match r.map_err(|e| e.reason()) {
             Ok(()) => panic!("proof should not pass"),
             Err(InvalidProofReason::RangeCheck(_)) => (),
